@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CrewListr Pro
+Comment=Private offline crew-list preparation
+Exec=CrewListrPro
+Terminal=false
+Categories=Office;Utility;
+Icon=CrewListrPro
