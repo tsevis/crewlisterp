@@ -30,10 +30,18 @@ jobs:
       - run: python -m mypy crewlisterpro
       - run: python -m pytest -q
 
+  # Packaging runs only for a tag, or when someone asks for it by hand.
+  #
+  # Quality is the gate that has to run on every commit; building a Windows
+  # installer and a Linux AppImage on each one costs minutes to tell us what we
+  # already knew. `workflow_dispatch` is kept as the escape hatch, so the
+  # packaging path can be exercised without cutting a tag — otherwise the only
+  # way to test a change to the build scripts is to perform a release.
   package-windows:
     name: Windows installer
     runs-on: windows-2022
     needs: quality
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -53,6 +61,7 @@ jobs:
     name: Linux AppImage
     runs-on: ubuntu-24.04
     needs: quality
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
