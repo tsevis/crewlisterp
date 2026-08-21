@@ -1,0 +1,72 @@
+name: CrewListr Pro Python release gate
+
+# Moved here from the crewlistr monorepo, where this project lived in a
+# `crewlisterpro/` subdirectory. That subdirectory is now this repository's
+# root, so the path filters and every `working-directory` it carried are gone.
+# `mypy crewlisterpro` is unchanged: the *package* is still `crewlisterpro/`,
+# it simply sits at the root rather than one level down.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Quality (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m ruff check .
+      - run: python -m mypy crewlisterpro
+      - run: python -m pytest -q
+
+  package-windows:
+    name: Windows installer
+    runs-on: windows-2022
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip pyinstaller
+      - run: python -m pip install .
+      - run: choco install innosetup --no-progress --yes
+      - shell: pwsh
+        run: ./scripts/build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrewListrPro-Windows
+          path: dist/installer/CrewListrPro-Setup.exe
+
+  package-linux:
+    name: Linux AppImage
+    runs-on: ubuntu-24.04
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip pyinstaller
+      - run: python -m pip install .
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1
+      - run: curl -L -o /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+      - run: chmod +x /tmp/appimagetool.AppImage && sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
+      - run: ./scripts/build-linux.sh
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrewListrPro-Linux
+          path: dist/CrewListrPro-x86_64.AppImage
