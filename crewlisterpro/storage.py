@@ -11,6 +11,7 @@ import base64
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +55,14 @@ class EncryptedStore:
         self._conn = sqlcipher.connect(self.app_dir / "crewlisterpro.db")
         key_hex = key_material.hex()
         self._conn.execute(f"PRAGMA key = \"x'{key_hex}'\"")
-        self._conn.execute("PRAGMA cipher_memory_security = ON")
+        # Memory hardening is off by default upstream, and the SQLCipher that
+        # sqlcipher3 0.6 bundles (4.12.0) crashes on Windows with it enabled:
+        # pytest died with "Windows fatal exception: stack overflow" on the
+        # CREATE TABLE immediately below. SQLCipher 4.18.0 fixed a Windows
+        # crash under this pragma, so drop the guard once sqlcipher3 ships a
+        # build with 4.18.0 or later. Linux and macOS keep the hardening.
+        if sys.platform != "win32":
+            self._conn.execute("PRAGMA cipher_memory_security = ON")
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS records (kind TEXT NOT NULL, id TEXT NOT NULL, payload BLOB NOT NULL, PRIMARY KEY(kind, id))"
         )
