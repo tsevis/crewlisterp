@@ -14,11 +14,19 @@ on:
 jobs:
   quality:
     name: Quality (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022]
+        # `os` still names the platform for the job title; `runner` is where it
+        # executes. Linux goes to the Mac Studio; Windows has no self-hosted
+        # host and stays here.
+        include:
+          - os: ubuntu-24.04
+            runner: [self-hosted, linux]
+          - os: windows-2022
+            runner: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
