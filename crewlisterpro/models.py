@@ -7,6 +7,7 @@ import ctypes
 import json
 import os
 import shutil
+import sys
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -116,7 +117,10 @@ class OllamaManager:
 def _physical_memory_bytes() -> int | None:
     """Best-effort cross-platform physical-memory detection for a first-run check."""
     try:
-        if os.name == "nt":
+        # sys.platform rather than os.name: mypy narrows on the former, so
+        # each branch is pruned when analysing the other platform. os.sysconf
+        # does not exist on Windows and kernel32 does not exist anywhere else.
+        if sys.platform == "win32":
             class MemoryStatus(ctypes.Structure):
                 _fields_ = [
                     ("length", ctypes.c_ulong),
