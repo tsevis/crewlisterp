@@ -9,6 +9,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from io import BytesIO
+from pathlib import Path
 from typing import cast
 
 from PIL import Image, ImageEnhance, ImageOps
@@ -235,11 +236,16 @@ class LocalOCR:
         return image, contrast, stronger_contrast
 
     def _run(self, image: Image.Image, extra: list[str], languages: str) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".png") as handle:
-            image.save(handle.name)
+        # A temporary *directory*, not NamedTemporaryFile: the latter keeps an
+        # exclusive handle open for its lifetime, so on Windows neither PIL nor
+        # tesseract can open the path while it exists. Both need to open it by
+        # name, so nothing may be holding it.
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "page.png"
+            image.save(page)
             try:
                 result = subprocess.run(
-                    [self.tesseract or "tesseract", handle.name, "stdout", "--psm", "6", "-l", languages, *extra],
+                    [self.tesseract or "tesseract", str(page), "stdout", "--psm", "6", "-l", languages, *extra],
                     capture_output=True,
                     text=True,
                     timeout=self.timeout_seconds,
