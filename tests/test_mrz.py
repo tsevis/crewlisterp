@@ -7,8 +7,6 @@ document appears here. Check digits are computed with the module's own
 
 from __future__ import annotations
 
-from datetime import date
-
 import pytest
 
 from crewlisterpro.ocr import checksum, parse_mrz

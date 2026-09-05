@@ -7,9 +7,8 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from io import BytesIO
-from itertools import pairwise
 from typing import cast
 
 from PIL import Image, ImageEnhance, ImageOps
@@ -178,7 +177,7 @@ def _mrz_date(value: str, kind: str = "birth", today: date | None = None) -> str
     """
     if len(value) != 6 or not value.isdigit():
         return ""
-    today = today or date.today()
+    today = today or datetime.now(tz=UTC).date()
     candidate = today.year - today.year % 100 + int(value[:2])
     if kind == "birth":
         year = candidate - 100 if candidate > today.year else candidate
