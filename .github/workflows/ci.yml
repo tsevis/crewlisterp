@@ -7,7 +7,17 @@ name: CrewListr Pro Python release gate
 # it simply sits at the root rather than one level down.
 
 on:
+  # Filtered to main deliberately. Unfiltered, a branch push and the pull
+  # request that follows it each ran the full `quality` matrix, so every
+  # PR billed its `windows-2022` leg TWICE -- the one job here that has
+  # nowhere to go but GitHub's runners. `pull_request` still covers the
+  # branch, so nothing goes unchecked; only the duplicate is gone.
+  #
+  # Safe to make `quality` a required check, unlike a PATH filter: this
+  # narrows which branches trigger a push run, and the pull_request
+  # trigger below is unfiltered.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
