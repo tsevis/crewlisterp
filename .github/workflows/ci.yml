@@ -22,21 +22,75 @@ on:
   workflow_dispatch:
 
 jobs:
+  hosted-allowance:
+    # Can this repository use GitHub's runners today?
+    #
+    # 2026-09-06: the account's 3,000 included minutes ran out. GitHub does not
+    # FAIL a hosted job when that happens -- it refuses to START it, so the job
+    # ends in seconds with no steps and reads on the checks list exactly like a
+    # code regression. Everything below is gated on this instead, so a red run
+    # keeps meaning "the code broke".
+    #
+    # What is genuinely lost while this is armed: Windows is not tested, and a
+    # tag builds neither the Windows installer nor the x86_64 AppImage. Neither
+    # has anywhere to go on an arm64 Mac. This job SAYS SO on every run -- a
+    # gate that skips in silence is how one rots unnoticed.
+    #
+    # Armed by the HOSTED_BLOCKED_UNTIL repository variable (a YYYY-MM-DD reset
+    # date). It disarms itself on that date; clearing the variable disarms it
+    # at once. Runs on the Mac, so it costs nothing to ask.
+    runs-on: [self-hosted, linux]
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+      quality_matrix: ${{ steps.check.outputs.quality_matrix }}
+    steps:
+      - name: Are GitHub's runners usable?
+        id: check
+        env:
+          BLOCKED_UNTIL: ${{ vars.HOSTED_BLOCKED_UNTIL }}
+        run: |
+          # `os` names the platform for the job title; `runner` is where it
+          # executes. Linux goes to the Mac Studio and is never affected;
+          # Windows is the leg that disappears while the allowance is out.
+          linux='{"os":"ubuntu-24.04","runner":["self-hosted","linux"]}'
+          windows='{"os":"windows-2022","runner":"windows-2022"}'
+          today=$(date -u +%Y%m%d)
+          target=$(printf '%s' "${BLOCKED_UNTIL:-}" | tr -d '-')
+          ok=yes
+          case "$target" in
+            ''|*[!0-9]*)
+              echo "HOSTED_BLOCKED_UNTIL is unset or not a YYYY-MM-DD date; treating GitHub's runners as usable."
+              ;;
+            *)
+              if [ "$today" -ge "$target" ]; then
+                echo "::notice title=Hosted runners are back::Past $BLOCKED_UNTIL. Clear the HOSTED_BLOCKED_UNTIL variable to retire this gate."
+              else
+                ok=no
+              fi
+              ;;
+          esac
+          if [ "$ok" = yes ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "quality_matrix=[$linux,$windows]" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "quality_matrix=[$linux]" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Windows is not being tested::The account's Actions allowance is exhausted, so hosted jobs are refused before they start. Until $BLOCKED_UNTIL this workflow tests Linux ONLY, and a tag will build neither the Windows installer nor the x86_64 AppImage. Windows breakage in this window would be undetected, not absent."
+          fi
+
   quality:
+    needs: hosted-allowance
     name: Quality (${{ matrix.os }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2022]
-        # `os` still names the platform for the job title; `runner` is where it
-        # executes. Linux goes to the Mac Studio; Windows has no self-hosted
-        # host and stays here.
-        include:
-          - os: ubuntu-24.04
-            runner: [self-hosted, linux]
-          - os: windows-2022
-            runner: windows-2022
+        # Built by hosted-allowance, which holds the Windows leg back while
+        # GitHub is refusing to start hosted jobs. It has to be withheld here
+        # rather than skipped with an `if:`: `matrix` is not one of the
+        # contexts available to a job-level `if:`, so a condition there cannot
+        # see which leg it is looking at.
+        include: ${{ fromJSON(needs.hosted-allowance.outputs.quality_matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -58,8 +112,9 @@ jobs:
   package-windows:
     name: Windows installer
     runs-on: windows-2022
-    needs: quality
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    needs: [quality, hosted-allowance]
+    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
+        && needs.hosted-allowance.outputs.available == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -79,8 +134,9 @@ jobs:
     name: Linux AppImage
     # tsevisrunner: keep-hosted x86_64 AppImage; the Linux runners are arm64
     runs-on: ubuntu-24.04
-    needs: quality
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    needs: [quality, hosted-allowance]
+    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
+        && needs.hosted-allowance.outputs.available == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
