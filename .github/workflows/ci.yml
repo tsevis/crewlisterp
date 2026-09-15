@@ -21,6 +21,23 @@ on:
   pull_request:
   workflow_dispatch:
 
+# ONE RUN IN FLIGHT PER REF, ON EVERY REF: the newest run wins. There was no
+# concurrency block at all, so pushing twice to a branch queued two full runs
+# and the second waited for the first -- for a verdict nobody would read.
+#
+# The wait is not hypothetical here even though half this matrix is hosted:
+# `hosted-allowance` and the Linux leg of `quality` run on the Mac Studio,
+# which is shared with every other repository's self-hosted runners and has sat
+# at load 50 on 20 cores. A superseded run of those legs makes something else
+# wait. And while the allowance is out, the hosted legs do not exist at all, so
+# every job in this workflow is on that one box.
+#
+# `github.run_id` for a manual dispatch, so two deliberate runs of the same ref
+# do not cancel each other -- someone who presses the button twice means it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   hosted-allowance:
     # Can this repository use GitHub's runners today?
