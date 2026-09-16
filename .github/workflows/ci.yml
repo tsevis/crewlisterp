@@ -38,8 +38,35 @@ jobs:
     #
     # Armed by the HOSTED_BLOCKED_UNTIL repository variable (a YYYY-MM-DD reset
     # date). It disarms itself on that date; clearing the variable disarms it
-    # at once. Runs on the Mac, so it costs nothing to ask.
-    runs-on: [self-hosted, linux]
+    # at once.
+    #
+    # AND IT IS ALSO DISARMED BY THIS REPOSITORY BEING PUBLIC, which is the
+    # case it was not written for. The allowance is spent by PRIVATE
+    # repositories; standard GitHub-hosted runners are free in public ones.
+    # Measured 2026-09-16 on tsevis/philon-python, also public, on its first
+    # hosted run: `/actions/runs/<id>/timing` answered
+    #
+    #     {"UBUNTU":{"jobs":1,"total_ms":0}}
+    #
+    # -- zero billable milliseconds. So while this repository is public the
+    # allowance cannot be the thing stopping a job, and withholding Windows
+    # for it withholds the only coverage Windows has for no saving at all.
+    #
+    # NOT ON THE MAC ANY MORE. This job used to run on `[self-hosted, linux]`
+    # "so it costs nothing to ask" -- and then this repository went public.
+    # `tsevisrunner status`, 2026-09-16:
+    #
+    #   PUBLIC — NO RUNNER WILL BE STARTED
+    #     crewlisterp  linux down -- this app did not stop it
+    #
+    # That refusal is right: on a public repository a `pull_request` workflow
+    # runs the author's code, anyone can be the author, and it would run on
+    # that Mac as its owner with its SSH keys. So the label was asking for a
+    # runner that could never arrive -- and because EVERY job below `needs`
+    # this one, the whole workflow stopped. One run sat queued from
+    # 2026-09-15T15:36:41Z, thirteen hours, with nothing counting: a job's
+    # `timeout-minutes` only starts once it is picked up.
+    runs-on: ubuntu-latest
     outputs:
       available: ${{ steps.check.outputs.available }}
       quality_matrix: ${{ steps.check.outputs.quality_matrix }}
@@ -48,15 +75,34 @@ jobs:
         id: check
         env:
           BLOCKED_UNTIL: ${{ vars.HOSTED_BLOCKED_UNTIL }}
+          IS_PRIVATE: ${{ github.event.repository.private }}
         run: |
           # `os` names the platform for the job title; `runner` is where it
           # executes. Linux goes to the Mac Studio and is never affected;
           # Windows is the leg that disappears while the allowance is out.
-          linux='{"os":"ubuntu-24.04","runner":["self-hosted","linux"]}'
+          # Hosted, for the reason in this job's own comment: a public
+          # repository gets no self-hosted runner from this fleet, so the Mac
+          # Studio is not somewhere this leg can go.
+          linux='{"os":"ubuntu-24.04","runner":"ubuntu-24.04"}'
           windows='{"os":"windows-2022","runner":"windows-2022"}'
           today=$(date -u +%Y%m%d)
           target=$(printf '%s' "${BLOCKED_UNTIL:-}" | tr -d '-')
           ok=yes
+
+          # A public repository does not spend the allowance, so it cannot be
+          # out of it. Checked before the date, because the date is a guess
+          # about when a BILLED account resets and this is a fact about now.
+          # `= false`, not `!= true`: an event whose payload carries no
+          # `repository.private` would read as public under the second
+          # spelling and turn the gate off for a PRIVATE repository, which is
+          # the one case it exists for. Unknown falls through to the date.
+          if [ "${IS_PRIVATE}" = "false" ]; then
+            echo "::notice title=Public repository::Standard GitHub-hosted runners are free here, so the allowance gate does not apply and Windows is tested. Measured 2026-09-16 on a sibling public repository: total_ms=0 billable."
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "quality_matrix=[$linux,$windows]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           case "$target" in
             ''|*[!0-9]*)
               echo "HOSTED_BLOCKED_UNTIL is unset or not a YYYY-MM-DD date; treating GitHub's runners as usable."
