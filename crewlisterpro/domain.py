@@ -41,6 +41,11 @@ class Trip:
     return_date: str = ""
     status: str = "draft"
     created_at: str = field(default_factory=utc_now)
+    #: When and where passengers board, for the passenger manifest: ``HH:MM``
+    #: and a port name, empty until the operator knows. Older records have
+    #: neither key and load with the defaults.
+    embarkation_time: str = ""
+    embarkation_port: str = ""
 
     def payload(self) -> dict[str, str]:
         return asdict(self)

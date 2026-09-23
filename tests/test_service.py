@@ -59,7 +59,7 @@ def test_review_gate_and_verified_exports(tmp_path: Path) -> None:
     assert not allowed
     service.verify_document(document.id, document.fields)
     service.assign_role(trip.id, document.person_id, "skipper")
-    csv_path, pdf_path = service.export_trip(trip.id, tmp_path / "exports")
+    csv_path, pdf_path, _manifest = service.export_trip(trip.id, tmp_path / "exports")
     assert csv_path.exists()
     assert pdf_path.exists()
     assert next(csv.DictReader(csv_path.open(encoding="utf-8")))["role"] == "skipper"
