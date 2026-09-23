@@ -9,6 +9,7 @@ from typing import TypeVar
 
 from .domain import Assignment, Boat, Document, Person, Trip, load_record
 from .exporters import export_csv, export_pdf
+from .manifest import embarkation_time, write_manifest
 from .models import OllamaManager
 from .ocr import LocalOCR, load_image
 from .storage import EncryptedStore
@@ -72,6 +73,19 @@ class CrewListrService:
         if return_date < departure:
             raise ValueError("Return date must not precede departure date.")
         trip = Trip(boat_id=boat_id, departure_date=departure.isoformat(), return_date=return_date.isoformat())
+        self.store.save("trip", trip.id, trip.payload())
+        return trip
+
+    def set_embarkation(self, trip_id: str, time: str, port: str) -> Trip:
+        """Sets when and where passengers board; a time that is not ``HH:MM`` is refused."""
+        normalised = embarkation_time(time)
+        if normalised is None:
+            raise ValueError("Boarding time must be HH:MM, for example 08:00.")
+        trip = self._load_one("trip", trip_id, Trip)
+        if trip is None:
+            raise ValueError("Trip not found, or its stored record could not be read.")
+        trip.embarkation_time = normalised
+        trip.embarkation_port = port.strip().upper()
         self.store.save("trip", trip.id, trip.payload())
         return trip
 
@@ -145,7 +159,7 @@ class CrewListrService:
         problems = [document.file_name for document in documents if document.risk_level != "low" or not document.verified_fields]
         return not problems and bool(documents), problems
 
-    def export_trip(self, trip_id: str, destination: Path) -> tuple[Path, Path]:
+    def export_trip(self, trip_id: str, destination: Path) -> tuple[Path, Path, Path]:
         allowed, problems = self.exportable(trip_id)
         if not allowed:
             raise ValueError(f"Export is blocked until review is complete: {', '.join(problems) or 'no documents'}.")
@@ -163,9 +177,11 @@ class CrewListrService:
         destination.mkdir(parents=True, exist_ok=True)
         stem = f"crew-list-{trip.departure_date}"
         csv_path, pdf_path = destination / f"{stem}.csv", destination / f"{stem}.pdf"
+        xlsx_path = destination / f"{stem}.xlsx"
         export_csv(csv_path, trip, boat, people, documents, assignments)
         export_pdf(pdf_path, trip, boat, people, documents, assignments)
-        return csv_path, pdf_path
+        write_manifest(xlsx_path, trip, people, documents, assignments)
+        return csv_path, pdf_path, xlsx_path
 
     def assign_role(self, trip_id: str, person_id: str, role: str) -> Assignment:
         if role not in {"skipper", "passenger"}:

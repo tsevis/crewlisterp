@@ -65,7 +65,7 @@ def main() -> None:
             self.setCentralWidget(content)
             toolbar = QToolBar("Workflow")
             self.addToolBar(toolbar)
-            for title, callback in (("New trip", self.new_trip), ("Import document", self.import_document), ("Verify selected", self.verify_selected), ("Export verified", self.export_trip), ("Local AI", self.prepare_local_ai)):
+            for title, callback in (("New trip", self.new_trip), ("Import document", self.import_document), ("Verify selected", self.verify_selected), ("Boarding", self.ask_embarkation), ("Export verified", self.export_trip), ("Local AI", self.prepare_local_ai)):
                 action = toolbar.addAction(title)
                 action.triggered.connect(callback)
             self.import_button = QPushButton("Import document")
@@ -80,8 +80,26 @@ def main() -> None:
             today = datetime.now(UTC).date()
             trip = self.service.create_trip(boat.id, today, today)
             self.trip_id = trip.id
+            self.ask_embarkation()
             self.status.setText("Trip ready. Import images or PDFs; exports remain disabled until review.")
             self.refresh()
+
+        def ask_embarkation(self) -> None:
+            """Boarding time and port, for the passenger manifest. Either may be left empty."""
+            if not self.trip_id:
+                return
+            port, ok = QInputDialog.getText(self, "Passenger manifest", "Boarding port (e.g. PIRAEUS):")
+            if not ok:
+                return
+            while True:
+                time, ok = QInputDialog.getText(self, "Passenger manifest", "Boarding time (HH:MM):")
+                if not ok:
+                    return
+                try:
+                    self.service.set_embarkation(self.trip_id, time, port)
+                    return
+                except ValueError as exc:
+                    QMessageBox.warning(self, "Boarding time", str(exc))
 
         def import_document(self) -> None:
             if not self.trip_id:
@@ -126,11 +144,11 @@ def main() -> None:
             if not destination:
                 return
             try:
-                csv_path, pdf_path = self.service.export_trip(self.trip_id, Path(destination))
+                written = self.service.export_trip(self.trip_id, Path(destination))
             except ValueError as exc:
                 QMessageBox.warning(self, "Export blocked", str(exc))
                 return
-            self.status.setText(f"Exported {csv_path.name} and {pdf_path.name}.")
+            self.status.setText(f"Exported {', '.join(path.name for path in written)}.")
 
         def prepare_local_ai(self) -> None:
             status = self.models.status()
