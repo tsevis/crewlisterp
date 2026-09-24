@@ -18,6 +18,11 @@ on:
   # trigger below is unfiltered.
   push:
     branches: [main]
+    # A release tag must trigger too. With only `branches` listed, GitHub
+    # ignores tag pushes entirely, so the tag condition on the packaging jobs
+    # below could never be met: v0.1.0 had to be packaged by dispatching this
+    # workflow on the tag by hand.
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
