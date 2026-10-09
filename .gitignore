@@ -8,3 +8,6 @@ build/
 dist/
 *.spec
 *.egg-info/
+
+# Private acceptance data for scripts/verify_mio_corpus.py; never commit it.
+tests/private_mio_manifest.json

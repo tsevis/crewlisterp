@@ -31,11 +31,10 @@ on:
 # and the second waited for the first -- for a verdict nobody would read.
 #
 # The wait is not hypothetical here even though half this matrix is hosted:
-# `hosted-allowance` and the Linux leg of `quality` run on the Mac Studio,
-# which is shared with every other repository's self-hosted runners and has sat
-# at load 50 on 20 cores. A superseded run of those legs makes something else
-# wait. And while the allowance is out, the hosted legs do not exist at all, so
-# every job in this workflow is on that one box.
+# `hosted-allowance` and the Linux leg of `quality` run on a self-hosted runner
+# that other repositories share. A superseded run of those legs makes something
+# else wait. And while the allowance is out, the hosted legs do not exist at all,
+# so every job in this workflow is on that one machine.
 #
 # `github.run_id` for a manual dispatch, so two deliberate runs of the same ref
 # do not cancel each other -- someone who presses the button twice means it.
@@ -74,16 +73,13 @@ jobs:
     # allowance cannot be the thing stopping a job, and withholding Windows
     # for it withholds the only coverage Windows has for no saving at all.
     #
-    # NOT ON THE MAC ANY MORE. This job used to run on `[self-hosted, linux]`
-    # "so it costs nothing to ask" -- and then this repository went public.
-    # `tsevisrunner status`, 2026-09-16:
-    #
-    #   PUBLIC — NO RUNNER WILL BE STARTED
-    #     crewlisterp  linux down -- this app did not stop it
-    #
-    # That refusal is right: on a public repository a `pull_request` workflow
-    # runs the author's code, anyone can be the author, and it would run on
-    # that Mac as its owner with its SSH keys. So the label was asking for a
+    # NOT ON A SELF-HOSTED RUNNER ANY MORE. This job used to run on
+    # `[self-hosted, linux]` "so it costs nothing to ask" -- and then this
+    # repository went public. The runner fleet refuses to start a runner for a
+    # public repository, and that refusal is right: on a public repository a
+    # `pull_request` workflow runs the author's code, anyone can be the author,
+    # and it would run on a self-hosted machine with that machine's credentials.
+    # So the label was asking for a
     # runner that could never arrive -- and because EVERY job below `needs`
     # this one, the whole workflow stopped. One run sat queued from
     # 2026-09-15T15:36:41Z, thirteen hours, with nothing counting: a job's
@@ -100,11 +96,11 @@ jobs:
           IS_PRIVATE: ${{ github.event.repository.private }}
         run: |
           # `os` names the platform for the job title; `runner` is where it
-          # executes. Linux goes to the Mac Studio and is never affected;
+          # executes. Linux is never affected;
           # Windows is the leg that disappears while the allowance is out.
           # Hosted, for the reason in this job's own comment: a public
-          # repository gets no self-hosted runner from this fleet, so the Mac
-          # Studio is not somewhere this leg can go.
+          # repository gets no self-hosted runner from this fleet, so this
+          # leg cannot go there.
           linux='{"os":"ubuntu-24.04","runner":"ubuntu-24.04"}'
           windows='{"os":"windows-2022","runner":"windows-2022"}'
           today=$(date -u +%Y%m%d)

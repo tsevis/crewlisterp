@@ -10,12 +10,10 @@ there is no `ci_scope.py` — the sibling repositories carry one
 thousands of tests; this one is not.
 
 What still applies is the machine. `hosted-allowance` and the Linux leg of
-`quality` run on the Mac Studio shared by every repository's self-hosted
-runners and by every agent session — it has sat at load 50 on 20 cores, and a
-container holding a job is capped at 4 CPUs while that lasts. While the hosted
-allowance is out, **every** job in `ci.yml` is on that one box. Long local
-loops (`mypy` over everything in a watch loop, repeated full builds) cost CI
-directly.
+`quality` run on a self-hosted runner that other repositories and agent
+sessions share, so it can be busy. While the hosted allowance is out, **every**
+job in `ci.yml` is on that one machine. Long local loops (`mypy` over
+everything in a watch loop, repeated full builds) cost CI directly.
 
 ## CI
 
