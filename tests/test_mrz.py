@@ -110,8 +110,8 @@ def test_impossible_calendar_dates_are_rejected(value):
 
 
 def test_a_garbled_name_line_does_not_discard_the_machine_readable_zone():
-    """Line 2 carries its own check digits; line 1 carries none. Half of a
-    real photographed set had a perfect line 2 beside a ruined line 1."""
+    """Line 2 carries its own check digits; line 1 carries none. OCR can ruin
+    line 1 while line 2 stays perfect, so line 2 must be usable on its own."""
     garbled = f"PEUKRMINCHUK<<OLSANDAAAAAAA1<1X11111111155\n{line2()}"
     result = parse_mrz(garbled)
     assert result is not None
